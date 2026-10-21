@@ -1,0 +1,516 @@
+﻿<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lumen - AI Assistant</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body {
+            background: linear-gradient(135deg, #e0e7ff 0%, #f3e8ff 50%, #e0f2fe 100%);
+            min-height: 100vh;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            overflow-x: hidden;
+        }
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(0, 0, 0, 0.1);
+            border-radius: 10px;
+        }
+        .mic-active {
+            animation: pulse-ring 1.5s infinite;
+            color: #ef4444 !important;
+        }
+        @keyframes pulse-ring {
+            0% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.2); opacity: 0.7; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+
+        /* Animation เคลื่อนย้ายตำแหน่งช่องค้นหา */
+        .search-center {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .search-bottom {
+            position: fixed;
+            top: auto;
+            bottom: 6rem;
+            left: 50%;
+            transform: translate(-50%, 0);
+            transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+    </style>
+</head>
+<body class="flex flex-col justify-between items-center relative pb-28 min-h-screen">
+
+    <!-- Warning Screen (หน้าจอแจ้งเตือนแรกเข้าเว็บ) -->
+    <div id="warningScreen" onclick="enterApp()" class="fixed inset-0 bg-black z-50 flex flex-col justify-center items-center text-center cursor-pointer select-none px-6 transition-opacity duration-500">
+        <div class="text-amber-400 text-6xl mb-6">
+            <i class="fas fa-exclamation-triangle"></i>
+        </div>
+        <h2 class="text-amber-400 text-3xl md:text-4xl font-bold mb-4">คำเตือน</h2>
+        <p class="text-amber-400 text-xl md:text-2xl font-medium mb-2">นี่ยังเป็นโมเดลAIที่ไม่สมบูรณ์</p>
+        <p class="text-amber-400 text-lg md:text-xl opacity-90">กดตรงไหนก็ไดเพื่อเข้า</p>
+    </div>
+
+    <!-- Toast Notification -->
+    <div id="toast" class="fixed top-5 z-50 transform -translate-y-20 opacity-0 transition-all duration-300 bg-gray-900 text-white px-6 py-3 rounded-2xl shadow-xl flex items-center space-x-3">
+        <i id="toastIcon" class="fas fa-check-circle text-emerald-400 text-lg"></i>
+        <span id="toastMessage" class="text-sm font-medium">สำเร็จ</span>
+    </div>
+
+    <!-- Main Container -->
+    <div class="w-full max-w-2xl px-4 flex flex-col items-center pt-10">
+        <h1 class="text-5xl md:text-6xl font-light tracking-tight text-gray-900 mb-8 mt-4">Lumen</h1>
+        <div id="chatContainer" class="w-full space-y-4 mb-24 max-h-[55vh] overflow-y-auto px-2 hidden"></div>
+    </div>
+
+    <!-- Search / Input Bar -->
+    <div id="searchBarContainer" class="search-center w-full max-w-xl px-4 z-30">
+        <div class="relative flex items-center bg-white rounded-full shadow-lg border border-white/60 px-5 py-3.5 transition-all duration-300 focus-within:ring-2 focus-within:ring-indigo-300">
+            <button id="actionBtn" class="text-gray-700 hover:text-black mr-3 text-xl transition-transform hover:scale-110 focus:outline-none" title="เมนูเสริม">
+                <i class="fas fa-plus"></i>
+            </button>
+            <input id="userInput" type="text" placeholder="ถามLumen" class="w-full bg-transparent outline-none text-gray-800 placeholder-gray-400 text-lg">
+            <button id="micBtn" class="text-gray-700 hover:text-black ml-3 text-xl transition-transform hover:scale-110 focus:outline-none" title="สั่งงานด้วยเสียง">
+                <i class="fas fa-microphone" id="micIcon"></i>
+            </button>
+        </div>
+    </div>
+
+    <!-- Bottom Dock -->
+    <div class="fixed bottom-4 z-40 bg-white/90 backdrop-blur-md rounded-full shadow-lg border border-white/50 px-8 py-3 flex items-center space-x-10">
+        <button onclick="goHome()" class="text-black hover:text-indigo-600 text-2xl transition-transform hover:scale-110" title="หน้าหลัก">
+            <i class="fas fa-home"></i>
+        </button>
+        <button onclick="openSearchModal()" class="text-black hover:text-indigo-600 text-2xl transition-transform hover:scale-110" title="ค้นหาประวัติแชท">
+            <i class="fas fa-search"></i>
+        </button>
+        <button onclick="openInfoModal()" class="text-black hover:text-indigo-600 text-2xl transition-transform hover:scale-110" title="ข้อมูลระบบ">
+            <i class="fas fa-info-circle"></i>
+        </button>
+        <button onclick="shareChat()" class="text-black hover:text-indigo-600 text-2xl transition-transform hover:scale-110" title="แชร์เว็บ">
+            <i class="fas fa-share-alt"></i>
+        </button>
+    </div>
+
+    <!-- Search Modal -->
+    <div id="searchModal" class="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 hidden flex justify-center items-center p-4">
+        <div class="bg-white rounded-3xl w-full max-w-lg p-6 shadow-2xl relative transform transition-all">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-xl font-semibold text-gray-800"><i class="fas fa-search mr-2 text-indigo-500"></i>ค้นหาประวัติการสนทนา</h3>
+                <button onclick="closeSearchModal()" class="text-gray-400 hover:text-gray-600 text-xl"><i class="fas fa-times"></i></button>
+            </div>
+            <input type="text" id="searchInputModal" placeholder="พิมพ์คำค้นหาในประวัติแชท..." class="w-full bg-gray-100 border border-gray-200 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-indigo-400 mb-4">
+            <div id="searchResults" class="max-h-60 overflow-y-auto space-y-2 text-sm text-gray-700">
+                <p class="text-gray-400 text-center py-4">ยังไม่มีประวัติการค้นหา</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Info Modal -->
+    <div id="infoModal" class="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 hidden flex justify-center items-center p-4">
+        <div class="bg-white rounded-3xl w-full max-w-lg p-6 shadow-2xl relative transform transition-all">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-xl font-semibold text-gray-800"><i class="fas fa-info-circle mr-2 text-indigo-500"></i>ข้อมูลระบบ Lumen AI Core</h3>
+                <button onclick="closeInfoModal()" class="text-gray-400 hover:text-gray-600 text-xl"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="space-y-3 text-gray-600 text-sm leading-relaxed">
+                <p><strong>เวอร์ชัน:</strong> Autonomous C++ AI Core v4.12 (Web Edition)</p>
+                <p><strong>ผู้พัฒนา:</strong> ไตเติ้ล</p>
+                <p><strong>ฟังก์ชันเด่น:</strong></p>
+                <ul class="list-disc pl-5 space-y-1">
+                    <li>ระบบคลังความรู้ขนาดใหญ่ (Knowledge Base)</li>
+                    <li>รองรับคำสั่ง <code class="bg-gray-100 px-1 py-0.5 rounded text-indigo-600">จดจำ [หัวข้อ] [ข้อมูล]</code> และ <code class="bg-gray-100 px-1 py-0.5 rounded text-indigo-600">ลบความจำ [หัวข้อ]</code></li>
+                    <li>รองรับการตอบรับคำทักทาย</li>
+                    <li>ย้ายตำแหน่งช่องค้นหาอัตโนมัติเมื่อพิมพ์</li>
+                    <li>รองรับการค้นหาผ่าน Google อัตโนมัติเมื่อไม่พบข้อมูล</li>
+                    <li>รองรับการสั่งงานด้วยเสียงภาษาไทย (Voice Recognition)</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <!-- JavaScript Logic -->
+    <script>
+        // ฟังก์ชันกดเพื่อเข้าสู่หน้าเว็บหลัก
+        function enterApp() {
+            const warningScreen = document.getElementById('warningScreen');
+            warningScreen.style.opacity = '0';
+            setTimeout(() => {
+                warningScreen.style.display = 'none';
+            }, 500);
+        }
+
+        let smartKnowledgeBase = {
+            "โลก": "ดาวโลก (Earth) เป็นดาวเคราะห์ลำดับที่ 3 จากดวงอาทิตย์ในระบบสุริยะ และเป็นดาวเคราะห์ดวงเดียวในปัจจุบันที่ทราบว่ามีสิ่งมีชีวิตอาศัยอยู่",
+            "สร้าง": "ไตเติ้ล",
+            "ระบบสุริยะ": "ดวงอาทิตย์เป็นศูนย์กลางของระบบสุริยะ มีแรงโน้มถ่วงดึงดูดดาวเคราะห์และวัตถุต่างๆ ให้โคจรล้อมรอบ",
+            "แสง": "ความเร็วของแสงประมาณ 300,000 กิโลเมตรต่อวินาที",
+            "คำศัพท์apple": "แปลว่า แอปเปิ้ล",
+            "สูตรพื้นที่สามเหลี่ยม": "พื้นที่สามเหลี่ยม = 1/2 x ฐาน x สูง",
+            "คุณเป็นใคร": "ฉันเป็นโมเดลภาษาขนาดเล็ก ที่พัฒนาโดย ไตเติ้ล สร้างขึ้นมาเพื่อช่วยเหลือ ค้นหาข้อมูล ตอบคำถาม และสื่อสารกับคุณ",
+            "อาทิตย์": "ดวงอาทิตย์ เป็นดาวฤกษ์ดวงเดียว ณ ศูนย์กลางระบบสุริยะ มีเส้นผ่านศูนย์กลางประมาณ 1.39 ล้านกิโลเมตร ใหญ่กว่าโลก 109 เท่า และมีมวลคิดเป็นร้อยละ 99.86 ของมวลทั้งหมดในระบบสุริยะ ประกอบด้วยก๊าซไฮโดรเจนเป็นหลัก รองลงมาคือฮีเลียม ซึ่งทำปฏิกิริยาฟิวชันให้พลังงานแสงและความร้อนแก่สิ่งมีชีวิตบนโลก",
+            "สูตรวงกลม": "พื้นที่วงกลม = pi * r^2 และเส้นรอบวง = 2 * pi * r",
+            "สูตรทฤษฎีบทพีทาโกรัส": "a^2 + b^2 = c^2 สำหรับสามเหลี่ยมมุมฉาก",
+            "ภาษา c++": "เป็นภาษาโปรแกรมระดับสูงที่เน้นประสิทธิภาพและนิยมใช้พัฒนาโปรเจกต์ขนาดใหญ่",
+            "html": "เป็นภาษาสำหรับจัดโครงสร้างเนื้อหาบนเว็บเพจ",
+            "ประเทศ": "ไทย มีกรุงเทพมหานครเป็นเมืองหลวง และใช้ภาษาไทยเป็นภาษาราชการ",
+            "ทวีป": "โลกแบ่งออกเป็น 7 ทวีป ได้แก่ เอเชีย แอฟริกา อเมริกาเหนือ อเมริกาใต้ แอนตาร์กติกา ยุโรป และออสเตรเลีย",
+            "น้ำ": "น้ำมีสูตรทางเคมีคือ H2O ประกอบด้วยไฮโดรเจน 2 อะตอม และออกซิเจน 1 อะตอม",
+            "การตั้งคำถาม": "ผู้ใช้สามารถถามคำถาม ค้นหาข้อมูล หรือสั่งให้จดจำข้อมูลใหม่ๆ ได้ตลอดเวลา",
+            "คำนวณ": "ใช้คำสั่งบวก ลบ คูณ หาร เพื่อประมวลผลตัวเลขทางคณิตศาสตร์",
+            "ประวัติศาสตร์": "เหตุการณ์สำคัญในอดีตที่บันทึกไว้ เพื่อเรียนรู้และเป็นบทเรียนสำหรับคนรุ่นหลัง",
+            "เศรษฐศาสตร์": "1+1 ไม่เท่ากับ 2 เสมอไป ขึ้นอยู่กับอุปสงค์ (Demand) และอุปทาน (Supply) ของตลาด",
+            "ดนตรี": "เสียงดนตรีประกอบด้วยองค์ประกอบหลัก ได้แก่ จังหวะ ท่วงทำนอง และประสานเสียง",
+            "ภาษาอังกฤษ": "Hello แปลว่า สวัสดี และ Thank you แปลว่า ขอบคุณ",
+            "คอมพิวเตอร์": "ฮาร์ดแวร์คืออุปกรณ์ที่จับต้องได้ ส่วนซอฟต์แวร์คือชุดคำสั่งหรือโปรแกรมที่สั่งให้ฮาร์ดแวร์ทำงาน",
+            "กีฬา": "การออกกำลังกายช่วยให้ร่างกายแข็งแรง ลดความเครียด และเสริมสร้างภูมิคุ้มกัน",
+            "จักรวาล": "เอกภพประกอบด้วยกาแล็กซี ดวงดาว หลุมดำ และสสารมืดจำนวนมหาศาลที่ยังสำรวจไม่หมด",
+            "ภูมิศาสตร์": "ศึกษาเกี่ยวกับลักษณะภูมิประเทศ ภูมิอากาศ และความสัมพันธ์ระหว่างมนุษย์กับสิ่งแวดล้อม",
+            "ชีววิทยา": "สิ่งมีชีวิตต้องมีการเจริญเติบโต การสืบพันธุ์ และการตอบสนองต่อสิ่งแวดล้อม",
+            "เคมี": "ตารางธาตุแบ่งออกเป็นหมู่และคาบตามสมบัติทางเคมีและโครงสร้างอะตอม",
+            "ฟิสิกส์": "พลังงานไม่สูญหายไปไหน แต่สามารถเปลี่ยนจากรูปหนึ่งไปเป็นอีกรูปหนึ่งได้",
+            "คณิตศาสตร์": "ศูนย์ (0) เป็นจำนวนเต็มที่เป็นจุดแบ่งระหว่างจำนวนบวกและจำนวนลบ",
+            "ระบบปฏิบัติการ": "ทำหน้าที่เป็นตัวกลางเชื่อมต่อระหว่างผู้ใช้กับฮาร์ดแวร์ของคอมพิวเตอร์",
+            "อินเทอร์เน็ต": "เครือข่ายคอมพิวเตอร์ขนาดใหญ่ที่เชื่อมต่อกันทั่วโลกผ่านโปรโตคอล TCP/IP",
+            "ศิลปะ": "การถ่ายทอดอารมณ์ ความคิด และความงามผ่านสื่อต่างๆ เช่น ภาพเขียน เสียงดนตรี หรือประติมากรรม",
+            "สุขภาพ": "การนอนหลับพักผ่อนอย่างน้อย 7-8 ชั่วโมงต่อวันช่วยให้ร่างกายและสมองซ่อมแซมส่วนที่สึกหรอ",
+            "อาหาร": "สารอาหารหลัก 5 หมู่ ได้แก่ โปรตีน คาร์โบไฮเดรต ไขมัน วิตามิน และเกลือแร่",
+            "ปัญญาประดิษฐ์": "AI หรือ Artificial Intelligence คือระบบคอมพิวเตอร์ที่สามารถเรียนรู้และคิดวิเคราะห์ได้คล้ายมนุษย์",
+            "การถ่ายภาพ": "การควบคุมแสงในงานถ่ายภาพประกอบด้วย รูรับแสง ความเร็วชัตเตอร์ และค่าความไวแสง ISO",
+            "จิตวิทยา": "ศึกษาเกี่ยวกับพบวนกรรม กระบวนการคิด อารมณ์ และพฤติกรรมของมนุษย์",
+            "ดาราศาสตร์": "วิทยาศาสตร์ที่ศึกษาเกี่ยวกับวัตถุท้องฟ้า เช่น ดาวฤกษ์ ดาวเคราะห์ ดาวหาง และกาแล็กซี",
+            "ภูมิอากาศ": "รูปแบบสภาพอากาศในระยะยาวของพื้นที่ใดพื้นที่หนึ่ง ซึ่งได้รับอิทธิพลจากละติจูดและกระแสน้ำ",
+            "เทคโนโลยีสารสนเทศ": "การจัดเก็บ ประมวลผล และเผยแพร่สารสนเทศโดยใช้คอมพิวเตอร์และโทรคมนาคม",
+            "สิ่งแวดล้อม": "ทรัพยากรธรรมชาติและสิ่งรอบตัวมนุษย์ที่มีผลต่อการดำรงชีวิตและการสมดุลของระบบนิเวศ",
+            "ภาษาโปรแกรม": "ภาษาที่ใช้เขียนคำสั่งเพื่อให้คอมพิวเตอร์ทำงานตามที่ต้องการ เช่น C, C++, Java, Python และ C#",
+            "โครงสร้างข้อมูล": "รูปแบบการจัดเก็บและจัดระเบียบข้อมูลในคอมพิวเตอร์เพื่อให้เรียกใช้งานและค้นหาได้อย่างมีประสิทธิภาพ",
+            "ระบบนิเวศ": "ความสัมพันธ์ระหว่างสิ่งมีชีวิตกับสิ่งแวดล้อมในพื้นที่หนึ่งๆ ที่พึ่งพาอาศัยกัน",
+            "ห่วงโซ่ออาหาร": "การถ่ายทอดพลังงานผ่านการกินต่อกันเป็นทอดๆ เริ่มจากผู้ผลิตไปยังผู้บริโภค",
+            "การสังเคราะห์ด้วยแสง": "กระบวนการที่พืชใช้น้ำ แสงอาทิตย์ และคาร์บอนไดออกไซด์เพื่อสร้างอาหารและออกซิเจน",
+            "แรงโน้มถ่วง": "แรงดึงดูดระหว่างมวลสารของวัตถุต่างๆ ซึ่งทำให้วัตถุตกลงสู่พื้นโลกและดาวเคราะห์โคจรรอบดวงอาทิตย์",
+            "สนามแม่เหล็กโลก": "สนามพลังงานที่ปกป้องโลกจากลมสุริยะและรังสีอันตรายจากอวกาศ",
+            "ปฏิกิริยานิวเคลียร์": "กระบวนการเปลี่ยนแปลงที่แกนกลางของอะตอม ซึ่งปลดปล่อยพลังงานมหาศาลออกมา เช่น บนดวงอาทิตย์",
+            "กาแล็กซีทางช้างเผือก": "กาแล็กซีที่เป็นที่ตั้งของระบบสุริยะและโลกของเรา มีลักษณะเป็นเกลียว",
+            "หลุมดำ": "วัตถุในอวกาศที่มีแรงโน้มถ่วงสูงมากจนแม้แต่แสงก็ไม่สามารถหนีหลุดรอดออกมาได้",
+            "แผ่นเปลือกโลก": "เปลือกโลกที่แบ่งออกเป็นชิ้นใหญ่และเคลื่อนตัวได้ ส่งผลให้เกิดแผ่นดินไหวและภูเขาไฟระเบิด",
+            "วัฏจักรของน้ำ": "การหมุนเวียนของน้ำจากแหล่งน้ำระเหยเป็นไอ ควบแน่นเป็นเมฆ และตกลงมาเป็นฝน",
+            "อุตุนิยมวิทยา": "วิทยาศาสตร์ที่ศึกษาเกี่ยวกับบรรยากาศและสภาพอากาศเพื่อพยากรณ์อากาศล่วงหน้า",
+            "ทรัพยากรธรรมชาติ": "สิ่งที่เกิดขึ้นเองตามธรรมชาติและมนุษย์สามารถนำมาใช้ประโยชน์ได้ เช่น น้ำ ป่าไม้ แร่ธาตุ",
+            "พลังงานหมุนเวียน": "พลังงานที่ได้จากธรรมชาติและไม่มีวันหมด เช่น พลังงานแสงอาทิตย์ พลังงานลม และพลังงานน้ำ",
+            "ประวัติศาสตร์สากล": "การศึกษาเรื่องราวของมนุษยชาติทั่วโลกตั้งแต่ยุคก่อนประวัติศาสตร์จนถึงยุคปัจจุบัน",
+            "อารยธรรมโบราณ": "กลุ่มสังคมมนุษย์ที่มีความเจริญรุ่งเรืองสูงในอดีต เช่น อารยธรรมอียิปต์ เมโสโปเตเมีย และกรีก",
+            "สงครามโลก": "ความขัดแย้งครั้งใหญ่ระดับโลกที่ส่งผลกระทบต่อเศรษฐกิจ การเมือง และสังคมทั่วโลก",
+            "ประชาธิปไตย": "ระบอบการปกครองที่อำนาจสูงสุดเป็นของประชาชนทุกคน โดยผ่านการเลือกตั้งและการมีส่วนร่วม",
+            "เศรษฐศาสตร์มหภาค": "การศึกษาเศรษฐกิจในภาพรวม เช่น เงินเฟ้อ อัตราการว่างงาน และผลิตภัณฑ์มวลรวมในประเทศ",
+            "เศรษฐศาสตร์จุลภาค": "การศึกษาพฤติกรรมทางเศรษฐกิจของหน่วยย่อย เช่น ผู้บริโภคและผู้ผลิตรายบุคคล",
+            "กฎหมายอุปสงค์และอุปทาน": "หลักการทางเศรษฐกิจที่ระบุว่าราคาสินค้าแปรผันตามความต้องการซื้อและความต้องการขาย",
+            "จิตวิทยาพัฒนาการ": "ศึกษาการเปลี่ยนแปลงทางร่างกาย จิตใจ และพฤติกรรมของมนุษย์ในแต่ละช่วงวัย",
+            "จิตวิทยาคลินิก": "สาขาที่มุ่งเน้นการวินิจฉัยและบำบัดรักษาความผิดปกติทางจิตใจและพฤติกรรม",
+            "ศิลปะเรอเนซองส์": "ยุคฟื้นฟูศิลปวิทยาการในยุโรปที่เน้นความงามตามธรรมชาติและสัดส่วนของมนุษย์",
+            "ดนตรีคลาสสิก": "ดนตรีตะวันตกที่มีรูปแบบโครงสร้างซับซ้อนและใช้วงออร์เคสตราขนาดใหญ่ในการบรรเลง",
+            "ทฤษฎีสี": "หลักการผสมสีและการใช้สีในงานศิลปะและการออกแบบเพื่อให้เกิดความกลมกลืน",
+            "วรรณกรรม": "งานเขียนที่แสดงออกถึงความคิด อารมณ์ และจินตนาการด้วยภาษาที่ประณีตงดงาม",
+            "ปรัชญา": "การศึกษาค้นหาความจริงเกี่ยวกับชีวิต ความรู้ จริยธรรม และการดำรงอยู่ของมนุษย์",
+            "ตรรกศาสตร์": "การศึกษาเกี่ยวกับการใช้เหตุผลที่ถูกต้องและการพิสูจน์ความสมเหตุสมผลของข้อสรุป",
+            "ภาษาศาสตร์": "การศึกษาโครงสร้าง การกำเนิด และการเปลี่ยนแปลงของภาษาพูดและภาษาเขียน",
+            "การแปลภาษา": "กระบวนการถ่ายความหมายจากภาษาหนึ่งไปสู่อีกภาษาหนึ่งโดยคงความหมายเดิมไว้",
+            "อัลกอริทึม": "ลำดับขั้นตอนวิธีเชิงตรรกะที่ใช้ในการแก้ปัญหาหรือสั่งงานคอมพิวเตอร์",
+            "ฐานข้อมูล": "ระบบการจัดเก็บและจัดการข้อมูลจำนวนมากให้อยู่ในระเบียบเพื่อให้ค้นหาได้ง่าย",
+            "ปัญญาประดิษฐ์เชิงลึก": "Deep Learning เครือข่ายประสาทเทียมหลายชั้นที่เลียนแบบการเรียนรู้ของสมองมนุษย์",
+            "ความปลอดภัยทางไซเบอร์": "การป้องกันระบบคอมพิวเตอร์และข้อมูลสารสนเทศจากการถูกเจาะหรือโจมตี",
+            "ระบบคลาวด์": "การให้บริการทรัพยากรคอมพิวเตอร์ผ่านอินเทอร์เน็ต เช่น การเก็บข้อมูลและการประมวลผล",
+            "อินเทอร์เน็ตทุกสรรพสิ่ง": "IoT การเชื่อมต่ออุปกรณ์อิเล็กทรอนิกส์ต่างๆ เข้ากับอินเทอร์เน็ตเพื่อควบคุมระยะไกล",
+            "การพัฒนาซอฟต์แวร์": "กระบวนการตั้งแต่การวางแผน ออกแบบ เขียนโค้ด และทดสอบระบบโปรแกรม",
+            "บล็อกเชน": "เทคโนโลยีการบันทึกข้อมูลแบบกระจายศูนย์ที่มีความปลอดภัยสูงและไม่สามารถแก้ไขย้อนหลังได้",
+            "ความเป็นจริงเสริม": "AR เทคโนโลยีที่ผสานภาพเสมือนจริงเข้ากับโลกจริงผ่านหน้าจออุปกรณ์",
+            "ความเป็นจริงเสมือน": "VR เทคโนโลยีที่จำลองสภาพแวดล้อมเสมือนจริงให้ผู้ใช้รู้สึกเหมือนเข้าไปอยู่ในนั้นจริงๆ",
+            "ประเทศญี่ปุ่น": "มีเมืองหลวงคือโตเกียว ใช้เงินสกุลเยน และภาษาญี่ปุ่นเป็นภาษาราชการ",
+            "ประเทศฝรั่งเศส": "มีเมืองหลวงคือปารีส มีสถานที่สำคัญคือหอไอเฟล",
+            "ประเทศอังกฤษ": "มีเมืองหลวงคือลอนดอน ใช้เงินสกุลปอนด์สเตอลิง",
+            "π พาย": "ค่า Pi (π) มีค่าประมาณ 3.14159 ใช้คำนวณวงกลม",
+            "ความเร็ว": "อัตราส่วนของระยะทางที่เคลื่อนที่ได้ต่อเวลาที่ใช้",
+            "แรง": "สิ่งที่ทำให้วัตถุเปลี่ยนสภาพการเคลื่อนที่ หรือเปลี่ยนรูปร่าง ตามกฎ F=ma",
+            "ความหนาแน่น": "มวลของวัตถุต่อหนึ่งหน่วยปริมาตร (D = m/V)",
+            "อะตอม": "หน่วยพื้นฐานของสสาร ประกอบด้วยโปรตอน นิวตรอน และอิเล็กตรอน",
+            "ตารางธาตุ": "การจัดเรียงธาตุเคมีตามเลขอะตอมและสมบัติทางเคมี",
+            "ดีเอ็นเอ": "DNA คือสารพันธุกรรมที่กำหนดลักษณะของสิ่งมีชีวิต",
+            "แบคทีเรีย": "สิ่งมีชีวิตเซลล์เดียวขนาดเล็ก สามารถพบได้ทั่วไปในธรรมชาติ",
+            "ไวรัส": "สิ่งมีชีวิตขนาดเล็กมากที่ต้องอาศัยอยู่ในเซลล์โฮสต์เพื่อเพิ่มจำนวน",
+            "หัวใจ": "อวัยวะทำหน้าที่สูบฉีดเลือดไปเลี้ยงส่วนต่างๆ ของร่างกาย",
+            "ปอด": "อวัยวะทำหน้าที่แลกเปลี่ยนแก๊สออกซิเจนและคาร์บอนไดออกไซด์",
+            "สมอง": "ศูนย์กลางการควบคุมการทำงานของร่างกาย ความคิด และความจำ",
+            "คีย์บอร์ด": "อุปกรณ์อินพุตใช้สำหรับพิมพ์ข้อความและคำสั่งเข้าคอมพิวเตอร์",
+            "เมาส์": "อุปกรณ์อินพุตใช้สำหรับควบคุมตัวชี้บนหน้าจอคอมพิวเตอร์",
+            "จอภาพ": "อุปกรณ์เอาต์พุตใช้สำหรับแสดงผลภาพและข้อความ",
+            "ซีพียู": "CPU คือหน่วยประมวลผลกลาง ทำหน้าที่คิดและคำนวณของคอมพิวเตอร์",
+            "แรม": "RAM คือหน่วยความจำหลักแบบชั่วคราวของคอมพิวเตอร์",
+            "ฮาร์ดดิสก์": "อุปกรณ์จัดเก็บข้อมูลแบบถาวรในคอมพิวเตอร์",
+            "พายุ": "พายุ คือ สภาพบรรยากาศที่แปรปรวนหรือถูกรบกวนอย่างรุนแรง เกิดขึ้นจากการเคลื่อนที่ของอากาศอย่างรวดเร็ว เนื่องจากความแตกต่างของอุณหภูมิและความกดอากาศในแต่ละพื้นที่ มักมาพร้อมกับลมแรง ฝนตกหนัก ฟ้าแลบ หรือหิมะตก"
+        };
+
+        function loadSavedMemories() {
+            const saved = localStorage.getItem('lumen_custom_memories');
+            if (saved) {
+                try {
+                    const parsed = JSON.parse(saved);
+                    Object.assign(smartKnowledgeBase, parsed);
+                } catch(e) {}
+            }
+        }
+        loadSavedMemories();
+
+        let chatHistory = [];
+
+        function showToast(message, iconClass = "fa-check-circle", iconColor = "text-emerald-400") {
+            const toast = document.getElementById('toast');
+            const toastMessage = document.getElementById('toastMessage');
+            const toastIcon = document.getElementById('toastIcon');
+
+            toastMessage.innerText = message;
+            toastIcon.className = `fas ${iconClass} ${iconColor} text-lg`;
+
+            toast.classList.remove('-translate-y-20', 'opacity-0');
+            toast.classList.add('translate-y-0', 'opacity-100');
+
+            setTimeout(() => {
+                toast.classList.remove('translate-y-0', 'opacity-100');
+                toast.classList.add('-translate-y-20', 'opacity-0');
+            }, 3000);
+        }
+
+        function moveSearchToBottom() {
+            const searchBar = document.getElementById('searchBarContainer');
+            if (searchBar.classList.contains('search-center')) {
+                searchBar.classList.remove('search-center');
+                searchBar.classList.add('search-bottom');
+            }
+        }
+
+        function moveSearchToCenter() {
+            const searchBar = document.getElementById('searchBarContainer');
+            if (searchBar.classList.contains('search-bottom')) {
+                searchBar.classList.remove('search-bottom');
+                searchBar.classList.add('search-center');
+            }
+        }
+
+        function appendMessage(role, text) {
+            const chatContainer = document.getElementById('chatContainer');
+            chatContainer.classList.remove('hidden');
+
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `flex ${role === 'user' ? 'justify-end' : 'justify-start'} mb-4`;
+
+            const bubble = document.createElement('div');
+            if (role === 'user') {
+                bubble.className = 'bg-indigo-600 text-white rounded-2xl rounded-tr-sm px-5 py-3 max-w-[80%] shadow-md text-base';
+                bubble.innerText = text;
+            } else {
+                bubble.className = 'bg-white text-gray-800 rounded-2xl rounded-tl-sm px-5 py-3 max-w-[80%] shadow-md border border-gray-100 text-base whitespace-pre-line';
+                bubble.innerText = text;
+            }
+
+            messageDiv.appendChild(bubble);
+            chatContainer.appendChild(messageDiv);
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+
+            chatHistory.push({ role, text });
+        }
+
+        function processAI(input) {
+            const lowerInput = input.toLowerCase().trim();
+
+            const greetings = ["สวัสดี", "สวัสดิ์", "ทักทาย", "หวัดดี", "ดีครับ", "ดีค่ะ", "hi", "hello", "hey"];
+            if (greetings.some(g => lowerInput === g || lowerInput.startsWith(g))) {
+                return "สวัสดีครับ! ฉันคือ Lumen AI Assistant ยินดีที่ได้รู้จักครับ มีอะไรให้ฉันช่วยเหลือวันนี้ไหมครับ? 😊";
+            }
+
+            if (lowerInput === "helpcode") {
+                return "--- รายการคำสั่งพิเศษ Lumen AI ---\n1. พิมพ์คำถามทั่วไป เช่น 'โลก', 'ระบบสุริยะ', 'สูตรพื้นที่สามเหลี่ยม'\n2. พิมพ์ 'จดจำ [หัวข้อ] [ข้อมูล]' เพื่อบันทึกความจำถาวร\n3. พิมพ์ 'ลบความจำ [หัวข้อ]' เพื่อลบข้อมูล\n4. พิมพ์ 'เวลา' หรือ 'วันที่' เพื่อดูเวลาปัจจุบัน";
+            }
+            else if (lowerInput.includes("เวลา") || lowerInput.includes("วันที่")) {
+                const now = new Date();
+                const thaiYear = now.getFullYear() + 543;
+                return `วันที่ ${now.getDate()} เดือน ${now.getMonth()+1} พ.ศ. ${thaiYear} (เวลา ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')} น.)`;
+            }
+            else if (lowerInput.startsWith("จดจำ") || lowerInput.startsWith("remember")) {
+                const parts = input.split(' ');
+                if (parts.length >= 3) {
+                    const key = parts[1].toLowerCase();
+                    const val = parts.slice(2).join(' ');
+                    smartKnowledgeBase[key] = val;
+                    
+                    let customMem = {};
+                    try {
+                        customMem = JSON.parse(localStorage.getItem('lumen_custom_memories') || '{}');
+                    } catch(e){}
+                    customMem[key] = val;
+                    localStorage.setItem('lumen_custom_memories', JSON.stringify(customMem));
+
+                    return `บันทึกความจำหัวข้อ '${key}' เรียบร้อยแล้วครับ!`;
+                } else {
+                    return "รูปแบบไม่ถูกต้อง ใช้รูปแบบ: 'จดจำ [หัวข้อ] [ข้อมูล]'";
+                }
+            }
+            else if (lowerInput.startsWith("ลบความจำ") || lowerInput.startsWith("forget")) {
+                const parts = input.split(' ');
+                if (parts.length >= 2) {
+                    const key = parts[1].toLowerCase();
+                    if (smartKnowledgeBase[key]) {
+                        delete smartKnowledgeBase[key];
+                        let customMem = JSON.parse(localStorage.getItem('lumen_custom_memories') || '{}');
+                        if (customMem[key]) {
+                            delete customMem[key];
+                            localStorage.setItem('lumen_custom_memories', JSON.stringify(customMem));
+                        }
+                        return `ลบความจำหัวข้อ '${key}' เรียบร้อยแล้วครับ`;
+                    } else {
+                        return `ไม่พบหัวข้อความจำ '${key}' ในระบบครับ`;
+                    }
+                } else {
+                    return "รูปแบบไม่ถูกต้อง ใช้รูปแบบ: 'ลบความจำ [หัวข้อ]'";
+                }
+            }
+            else {
+                let foundKey = Object.keys(smartKnowledgeBase).find(k => lowerInput.includes(k.toLowerCase()));
+                if (foundKey) {
+                    return smartKnowledgeBase[foundKey];
+                } else {
+                    const searchUrl = `https://www.google.com/search?q=${encodeURIComponent(input)}`;
+                    window.open(searchUrl, '_blank');
+                    return `กำลังเปิด Google เพื่อค้นหาเรื่อง '${input}' ให้คุณทันทีครับ!`;
+                }
+            }
+        }
+
+        const userInputElem = document.getElementById('userInput');
+        userInputElem.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                const text = userInputElem.value.trim();
+                if (text !== "") {
+                    moveSearchToBottom();
+                    appendMessage('user', text);
+                    userInputElem.value = "";
+                    setTimeout(() => {
+                        const reply = processAI(text);
+                        appendMessage('ai', reply);
+                    }, 400);
+                }
+            }
+        });
+
+        function goHome() {
+            document.getElementById('chatContainer').innerHTML = '';
+            document.getElementById('chatContainer').classList.add('hidden');
+            chatHistory = [];
+            moveSearchToCenter();
+            showToast("รีเซ็ตหน้ากลับสู่หน้าแรกแล้ว", "fa-home", "text-indigo-500");
+        }
+
+        function openSearchModal() {
+            document.getElementById('searchModal').classList.remove('hidden');
+        }
+        function closeSearchModal() {
+            document.getElementById('searchModal').classList.add('hidden');
+        }
+
+        document.getElementById('searchInputModal').addEventListener('input', function(e) {
+            const query = e.target.value.toLowerCase();
+            const resultsDiv = document.getElementById('searchResults');
+            resultsDiv.innerHTML = '';
+
+            const filtered = chatHistory.filter(item => item.text.toLowerCase().includes(query));
+            if (filtered.length === 0) {
+                resultsDiv.innerHTML = '<p class="text-gray-400 text-center py-4">ไม่พบประวัติการสนทนาที่ค้นหา</p>';
+                return;
+            }
+
+            filtered.forEach(item => {
+                const div = document.createElement('div');
+                div.className = 'p-3 bg-gray-50 rounded-xl border border-gray-100 mb-2';
+                div.innerHTML = `<span class="font-semibold text-indigo-600">${item.role === 'user' ? 'คุณ' : 'Lumen'}:</span> ${item.text}`;
+                resultsDiv.appendChild(div);
+            });
+        });
+
+        function openInfoModal() {
+            document.getElementById('infoModal').classList.remove('hidden');
+        }
+        function closeInfoModal() {
+            document.getElementById('infoModal').classList.add('hidden');
+        }
+
+        function shareChat() {
+            const shareUrl = window.location.href;
+            navigator.clipboard.writeText(shareUrl).then(() => {
+                showToast("คัดลอกลิงก์เพื่อแชร์เว็บสำเร็จแล้ว!", "fa-check-circle", "text-emerald-400");
+            }).catch(() => {
+                showToast("ไม่สามารถคัดลอกลิงก์ได้", "fa-exclamation-circle", "text-red-400");
+            });
+        }
+
+        const micBtn = document.getElementById('micBtn');
+        const micIcon = document.getElementById('micIcon');
+        let recognition = null;
+
+        if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            recognition = new SpeechRecognition();
+            recognition.lang = 'th-TH';
+            recognition.continuous = false;
+            recognition.interimResults = false;
+
+            recognition.onstart = () => {
+                micIcon.classList.remove('fa-microphone');
+                micIcon.classList.add('fa-microphone-lines', 'mic-active');
+                showToast("กำลังฟังเสียงพูดของคุณ...", "fa-microphone", "text-blue-500");
+            };
+
+            recognition.onresult = (event) => {
+                const speechText = event.results[0][0].transcript;
+                userInputElem.value = speechText;
+                moveSearchToBottom();
+                micIcon.classList.remove('fa-microphone-lines', 'mic-active');
+                micIcon.classList.add('fa-microphone');
+            };
+
+            recognition.onerror = () => {
+                micIcon.classList.remove('fa-microphone-lines', 'mic-active');
+                micIcon.classList.add('fa-microphone');
+            };
+
+            recognition.onend = () => {
+                micIcon.classList.remove('fa-microphone-lines', 'mic-active');
+                micIcon.classList.add('fa-microphone');
+            };
+
+            micBtn.addEventListener('click', () => {
+                try {
+                    recognition.start();
+                } catch(e) {
+                    recognition.stop();
+                }
+            });
+        } else {
+            micBtn.addEventListener('click', () => {
+                showToast("เบราว์เซอร์นี้ไม่รองรับการสั่งงานด้วยเสียง", "fa-exclamation-triangle", "text-amber-500");
+            });
+        }
+    </script>
+</body>
+</html>
