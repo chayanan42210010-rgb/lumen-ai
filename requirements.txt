@@ -1,0 +1,4 @@
+fiask
+gunicorn
+torch
+transformers
